@@ -2,10 +2,10 @@ import os
 import sys
 from glob import glob
 
-INSTALL_DIR = os.path.dirname(__file__)
-
 from . import plugins
 from .blueprint import Blueprint
+
+INSTALL_DIR = os.path.dirname(__file__)
 
 def get_plugin_dirs():
     plugin_dirs = []

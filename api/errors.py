@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# encoding: utf-8
-"""
-errors.py
-
-Created by Brandon Ashworth on 2010-12-27.
-Copyright (c) 2010 __MyCompanyName__. All rights reserved.
-"""
-
 import os
 import sys
 

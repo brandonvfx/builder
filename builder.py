@@ -6,16 +6,22 @@ from copy import copy
 from glob import glob
 from datetime import datetime
 from optparse import OptionParser, Values
+from pprint import pprint as pp
 
 from api import cabinet
 from api.context import Context
+from config import BuilderConfig
 
 INSTALL_DIR = os.path.dirname(__file__)
 
+CONFIG_DIR = os.path.expanduser(
+    os.path.expandvars(
+        os.getenv('BUILDER_CONFIG_DIR', '~/.builder')
+        )
+    )
+
 class Builder(object):
     """docstring for Builder"""
-    
-    #__usage__ = "\n%prog blueprint [options]\n%prog plugin.blueprint [options]"
     __usage__ = "prog plugin.blueprint [options]"
     
     def __init__(self):
@@ -23,6 +29,7 @@ class Builder(object):
         self.build_parser()
         self.plugin_dirs = self.get_plugin_dirs()
         self.plugins = self.get_plugins(self.plugin_dirs)
+        self.config = BuilderConfig(CONFIG_DIR)
     # end def __init__
     
     @property
@@ -46,6 +53,10 @@ class Builder(object):
     def parser_args(self, plugin, blueprint ):
         pass
     # end def parser_args
+
+    def check_for_alias(self, fullname):
+        return self.config.aliases.get(fullname)
+    # end def check_for_alias
     
     def main(self):
         cmd_args = copy(sys.argv)
@@ -70,6 +81,16 @@ class Builder(object):
             # end if
         # end if
         
+        aliased = self.check_for_alias(blueprint_fullname)
+        if aliased:
+            full_alias = aliased.split()
+            blueprint_fullname = full_alias.pop(0)
+            new_cmd_args = full_alias
+            new_cmd_args.extend(cmd_args)
+            cmd_args = new_cmd_args
+        # end if
+        pp(cmd_args)
+
         plugin_name, blueprint_name = self.parse_blueprint_name(blueprint_fullname)
         if plugin_name not in self.plugins:
             print "Error finding blueprint '%s'.\n" % plugin_name
@@ -96,40 +117,35 @@ class Builder(object):
         self.parser.add_options(blueprint_cls.options)
         self.parser.prog = '%s %s' % (self.parser.prog, blueprint_fullname)
         options, args = self.parser.parse_args(cmd_args)
-        #context = self.build_context(options)
         exit_code = 0
-        if not self.run_blueprint(blueprint_cls, self.build_options(options), args):
+        if not self.run_blueprint(
+            blueprint_cls, 
+            self.build_context(options, self.config.get_blueprint_config(blueprint_fullname)), 
+            args):
             exit_code = 1
         # end if
         sys.exit(exit_code)
     # end def main
     
-    def build_options(self, option_values):
-        options = {}#dict(now=datetime.now())
-        #options.update(self.config_file_values)
-        options.update(option_values.__dict__)
-        return options
-    # end def build_options
-        
-    # def build_context(self, options):
-    #     """
-    #     :synopsis: buildContext
-    #     """
-    #     context = Context(**options.__dict__)
-    #     return context
-    # # end def buildContext
+    def build_context(self, option_values, blueprint_config):
+        context = {}
+        context.update(blueprint_config)
+        for option, value in option_values.__dict__.iteritems():
+            if value != None:
+                context[option] = value
+            # end if
+        # end for
+        pp(context)
+        return context
+    # end def build_context
     
-    def parse_config_file(self):
-        return {}
-    # end parse_config_file
-    
-    def run_blueprint(self, blueprint_cls, options, args):
+    def run_blueprint(self, blueprint_cls, context, args):
         blueprint = blueprint_cls()
         # validate the options and args
-        valid = blueprint.validate(options, args)
+        valid = blueprint.validate(context, args)
         if valid:
             try:
-                blueprint.run(options, args)
+                blueprint.run(context, args)
             except Exception, ex:
                 print "Error running '%s' blueprint:\n" % (blueprint)
                 print ex
@@ -150,6 +166,7 @@ class Builder(object):
                 plugin_dirs.append(plugin_dir.strip())
         # end for
 
+        plugin_dirs.append(os.path.join(CONFIG_DIR, 'plugins'))
         plugin_dirs.append(os.path.join(INSTALL_DIR, 'plugins'))
         return plugin_dirs
     # end def get_plugin_dirs
@@ -179,7 +196,10 @@ class Builder(object):
         new_sys_path = copy(self.plugin_dirs)
         new_sys_path.extend(sys.path)
         sys.path = new_sys_path
-        __import__(plugin)
+        try:
+            __import__(plugin)
+        except ImportError:
+            raise RuntimeError("Could not import plugin: %s" % (plugin))
         plugin_mod = sys.modules[plugin]
         sys.path = old_sys_path
         return plugin_mod
