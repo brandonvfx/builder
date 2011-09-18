@@ -13,8 +13,15 @@ class BuilderConfig(object):
 	# end def __init__
 
 	def load_config(self):
+		config_path = os.path.join(self.config_dir, 'config')
+		
+		if not os.path.exists(config_path):
+			self.create_config_dir()
+			return
+		# end if 
+
 		config = ConfigParser.ConfigParser()
-		config.read(os.path.join(self.config_dir, 'config'))
+		config.read(config_path)
 
 		context_defualts_sections = ['builder', 'context']
 		aliases_sections = ['aliases']
@@ -36,4 +43,19 @@ class BuilderConfig(object):
 		config.update(self.blueprint_defaults.get(blueprint, {}))
 		return config
 	# end def get_blueprint_config
+
+	def create_config_dir(self):
+		dirs = ['plugins']
+		files = ['config']
+
+		for directory in dirs:
+			os.makedirs(os.path.join(self.config_dir, directory))
+		# end for
+		for file_name in files:
+			path = os.path.join(self.config_dir, file_name)
+			fd = open(path, 'w')
+			fd.close()
+		# end for
+		print "Created User Config: %s" % (self.config_dir)
+	# end def create_config_dir
 # end class Preferences

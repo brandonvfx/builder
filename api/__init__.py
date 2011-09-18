@@ -21,7 +21,6 @@ class Cabinet(object):
     # end def __str__
     
     def __getattr__(self, name):
-        print name
         if name.startswith('__') or name.startswith('_%s__' % self.__class__.__name__):
             return super(Cabinet, self).__getattribute__(name)
         else:

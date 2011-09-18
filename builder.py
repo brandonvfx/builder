@@ -6,7 +6,6 @@ from copy import copy
 from glob import glob
 from datetime import datetime
 from optparse import OptionParser, Values
-from pprint import pprint as pp
 
 from api import cabinet
 from api.context import Context
@@ -39,8 +38,10 @@ class Builder(object):
     
     def build_parser(self):
         self.parser = OptionParser(prog='builder', usage=self.__usage__)
+        self.parser.add_option('--logging-level', help='Set logging level. (Default: INFO)', action="store", default='INFO')
         self.parser.add_option('--list-plugins', help='List the available plugins.', action="store_true", default=False)
-        self.parser.add_option('--list-blueprints', help='List the available plugins.', action="store_true", default=False)
+        self.parser.add_option('--list-blueprints', help='List the available blueprints for a plugin.', 
+                                action="store_true", default=False)
     # end def build_parser
     
     def parse_blueprint_name(self, fullname):
@@ -49,17 +50,13 @@ class Builder(object):
         blueprint_name = "default" if len(parts) == 1 else parts[1]
         return plugin_name, blueprint_name
     # end def parse_plugin_blueprint
-    
-    def parser_args(self, plugin, blueprint ):
-        pass
-    # end def parser_args
 
     def check_for_alias(self, fullname):
         return self.config.aliases.get(fullname)
     # end def check_for_alias
     
-    def main(self):
-        cmd_args = copy(sys.argv)
+    def main(self, input_args=sys.argv):
+        cmd_args = copy(input_args)
         script = cmd_args.pop(0)
         if not cmd_args:
             print self.help
@@ -89,7 +86,6 @@ class Builder(object):
             new_cmd_args.extend(cmd_args)
             cmd_args = new_cmd_args
         # end if
-        pp(cmd_args)
 
         plugin_name, blueprint_name = self.parse_blueprint_name(blueprint_fullname)
         if plugin_name not in self.plugins:
@@ -135,27 +131,37 @@ class Builder(object):
                 context[option] = value
             # end if
         # end for
-        pp(context)
+        if 'list_blueprints' in context:
+            del context['list_blueprints']
+        # end if
+        if 'list_plugins'in context:
+            del context['list_plugins']
+        # end if
         return context
     # end def build_context
     
     def run_blueprint(self, blueprint_cls, context, args):
         blueprint = blueprint_cls()
-        # validate the options and args
         valid = blueprint.validate(context, args)
+        success = False
         if valid:
             try:
                 blueprint.run(context, args)
-            except Exception, ex:
+                success = True
+            except Exception, run_ex:
                 print "Error running '%s' blueprint:\n" % (blueprint)
-                print ex
-                return False
+                print run_ex
+                try:
+                    blueprint.rollback(context, args)
+                except Exception, roll_ex:
+                    print "Error rolling back '%s' blueprint:\n" % (blueprint)
+                    print roll_ex
+                # end try
             # end try
         else:
             print "Error:"
             print "\n".join(blueprint.errors)
-            return False
-        return True
+        return success
     # end def run_blueprint
     
     def get_plugin_dirs(self):
@@ -181,7 +187,6 @@ class Builder(object):
         all_plugins = []
         for plugin_dir in plugin_dirs:
             plugin_files = glob(os.path.join(plugin_dir, '*'))
-            #plugin_files = filter(os.path.isfile, plugin_files)
             all_plugins.extend(
                 map(lambda f: f.split('.')[0], 
                     map(os.path.basename, plugin_files)
@@ -198,8 +203,8 @@ class Builder(object):
         sys.path = new_sys_path
         try:
             __import__(plugin)
-        except ImportError:
-            raise RuntimeError("Could not import plugin: %s" % (plugin))
+        except Exception, ex:
+            raise RuntimeError("Could not import plugin: %s\n%s" % (plugin, ex))
         plugin_mod = sys.modules[plugin]
         sys.path = old_sys_path
         return plugin_mod
@@ -210,3 +215,4 @@ class Builder(object):
 if __name__ == '__main__':
     builder = Builder()
     builder.main()
+# end if
