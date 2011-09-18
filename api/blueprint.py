@@ -1,11 +1,7 @@
 import os
-import datetime
-from copy import deepcopy
-from optparse import make_option, OptionParser
+from optparse import make_option
 
-# Project Libs
-from context import Context
-from .errors import BuilderOptionsError
+from .logger import logger
 
 try:
     import jinja2
@@ -38,6 +34,7 @@ class BlueprintMeta(type):
         blueprint_config = getattr(cls, 'Meta', None)
         config = BlueprintConfig(blueprint_config)
         setattr(cls, '_config', config)
+        setattr(cls, 'logger', logger.getChild(config.name))
     # end def __init__
 # end class BlueprintMeta
 
@@ -50,7 +47,7 @@ class BlueprintBase(object):
     options = [
         make_option('--working_dir', dest='working_dir', action='store', default=os.getcwd()),
     ]
-    
+
     def __init__(self):
         """
         :synopsis: __init__
@@ -58,7 +55,7 @@ class BlueprintBase(object):
         super(BlueprintBase, self).__init__()
         
         if not self._config.version or not self._config.name: #or not self._config.namespace:
-            raise RuntimeError("You must set name, version, and namespace for " \
+            raise RuntimeError("You must set name and version for " \
                 "Blueprint class '%s'" % self.__class__.__name__)
         self.errors = []
     # end def __init__
@@ -75,6 +72,12 @@ class BlueprintBase(object):
     def clearErrors(self):
         self.errors = []
     # end def clearErrors
+
+    def printErrors(self):
+        for error in self.errors:
+            self.logger.error(error)
+        # end for
+    # end def printErrors
     
     def validate(self, context, args):
         """

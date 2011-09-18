@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 import os
 import sys
+import logging
 import traceback
 from copy import copy
 from glob import glob
 from datetime import datetime
-from optparse import OptionParser, Values
+from optparse import OptionParser
 
 from api import cabinet
-from api.context import Context
+from api.logger import logger
 from config import BuilderConfig
 
 INSTALL_DIR = os.path.dirname(__file__)
@@ -29,6 +30,7 @@ class Builder(object):
         self.plugin_dirs = self.get_plugin_dirs()
         self.plugins = self.get_plugins(self.plugin_dirs)
         self.config = BuilderConfig(CONFIG_DIR)
+        self.logger = logger
     # end def __init__
     
     @property
@@ -66,10 +68,10 @@ class Builder(object):
             print ", ".join(sorted(self.plugins))
             sys.exit(0)
         # end if
-        
+
         blueprint_fullname = cmd_args.pop(0)    
         if blueprint_fullname.startswith('-'):
-            options, args = self.parser.parse_args()
+            options, args = self.parser.parse_args(input_args)
             # if parsed and -h/--help is not there print help anyways 
             # since the args are incorrect.
             print "Blueprint must the be the first argument."
@@ -113,6 +115,8 @@ class Builder(object):
         self.parser.add_options(blueprint_cls.options)
         self.parser.prog = '%s %s' % (self.parser.prog, blueprint_fullname)
         options, args = self.parser.parse_args(cmd_args)
+        # set logging level
+        self.logger.setLevel(getattr(logging, options.logging_level.upper()))
         exit_code = 0
         if not self.run_blueprint(
             blueprint_cls, 
@@ -137,6 +141,9 @@ class Builder(object):
         if 'list_plugins'in context:
             del context['list_plugins']
         # end if
+        if 'logging_level'in context:
+            del context['logging_level']
+        # end if
         return context
     # end def build_context
     
@@ -159,8 +166,7 @@ class Builder(object):
                 # end try
             # end try
         else:
-            print "Error:"
-            print "\n".join(blueprint.errors)
+            blueprint.printErrors()
         return success
     # end def run_blueprint
     

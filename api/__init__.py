@@ -1,5 +1,3 @@
-plugins = {}
-
 class Cabinet(object):
     """ 
     :synopsis: Class PluginLibrary
