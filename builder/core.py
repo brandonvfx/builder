@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import sys
+import inspect
 import logging
 import traceback
 from copy import copy
@@ -8,9 +9,12 @@ from glob import glob
 from datetime import datetime
 from optparse import OptionParser
 
-from api import cabinet
-from api.logger import logger
-from config import BuilderConfig
+from pprint import pprint as pp
+
+from .api.logger import logger
+from .api.blueprint import Blueprint
+from .config import BuilderConfig
+from .utils import loadPlugin
 
 INSTALL_DIR = os.path.dirname(__file__)
 
@@ -27,10 +31,12 @@ class Builder(object):
     def __init__(self):
         super(Builder, self).__init__()
         self.build_parser()
-        self.plugin_dirs = self.get_plugin_dirs()
-        self.plugins = self.get_plugins(self.plugin_dirs)
         self.config = BuilderConfig(CONFIG_DIR)
+        self.plugins = self.config.plugins
+        self.loaded_plugins = []
+        self.blueprints = self.get_blueprints()
         self.logger = logger
+        self.plugin_data = {}
     # end def __init__
     
     @property
@@ -41,16 +47,16 @@ class Builder(object):
     def build_parser(self):
         self.parser = OptionParser(prog='builder', usage=self.__usage__)
         self.parser.add_option('--logging-level', help='Set logging level. (Default: INFO)', action="store", default='INFO')
-        self.parser.add_option('--list-plugins', help='List the available plugins.', action="store_true", default=False)
+        self.parser.add_option('--list-namespaces', help='List the available plugins.', action="store_true", default=False)
         self.parser.add_option('--list-blueprints', help='List the available blueprints for a plugin.', 
                                 action="store_true", default=False)
     # end def build_parser
     
     def parse_blueprint_name(self, fullname):
         parts = fullname.split('.', 1)
-        plugin_name = parts[0]
+        namespace = parts[0]
         blueprint_name = "default" if len(parts) == 1 else parts[1]
-        return plugin_name, blueprint_name
+        return namespace, blueprint_name
     # end def parse_plugin_blueprint
 
     def check_for_alias(self, fullname):
@@ -63,9 +69,9 @@ class Builder(object):
         if not cmd_args:
             print self.help
             sys.exit(2)
-        elif '--list-plugins' in cmd_args:
+        elif '--list-namespaces' in cmd_args:
             print "Installed plugins:"
-            print ", ".join(sorted(self.plugins))
+            print ", ".join(sorted(self.blueprints.keys()))
             sys.exit(0)
         # end if
 
@@ -89,26 +95,27 @@ class Builder(object):
             cmd_args = new_cmd_args
         # end if
 
-        plugin_name, blueprint_name = self.parse_blueprint_name(blueprint_fullname)
-        if plugin_name not in self.plugins:
-            print "Error finding blueprint '%s'.\n" % plugin_name
+        namespace, blueprint_name = self.parse_blueprint_name(blueprint_fullname)
+        if namespace not in self.blueprints:
+            print "Error finding blueprint '%s'.\n" % blueprint_fullname
             print "Installed plugins:"
             print ", ".join(sorted(self.plugins))
+            print "Namespaces from plugins:"
+            print ", ".join(sorted(self.blueprints.keys()))
             sys.exit(1)
         # end if 
 
-        plugin = self.import_plugin(plugin_name)
         if '--list-blueprints' in cmd_args:
-            print "Installed blueprints for '%s':" % (plugin_name)
-            print ", ".join(cabinet.keys())
+            print "Installed blueprints for '%s':" % (namespace)
+            print ", ".join(self.blueprints[namespace].keys())
             sys.exit(0)
         # end if
         
-        blueprint_cls = getattr(cabinet, blueprint_name, None)
+        blueprint_cls = self.blueprints[namespace].get(blueprint_name)
         if not blueprint_cls:
             print "No blueprint '%s'" % (blueprint_name)
-            print "Blueprints for '%s':" % (plugin_name)
-            print "\t", ", ".join(cabinet.keys())
+            print "Blueprints for '%s':" % (namespace)
+            print "\t", ", ".join(self.blueprints[namespace].keys())
             sys.exit(1)
         # end if
         
@@ -170,51 +177,40 @@ class Builder(object):
         return success
     # end def run_blueprint
     
-    def get_plugin_dirs(self):
-        plugin_dirs = []
-
-        for plugin_dir in os.getenv('BUILDER_PLUGIN_DIR', '').split(':'):
-            if plugin_dir.strip():
-                plugin_dirs.append(plugin_dir.strip())
+    def get_blueprints(self):
+        blueprints = {}
+        for plugin_name in self.plugins:
+            try:
+                plugin = loadPlugin(plugin_name)
+                self.loaded_plugins.append(plugin_name)
+            except ImportError:
+                logger.warn("Plugin '%s' could not be loaded.", plugin_name)
+            # end try
+            if plugin:
+                found_blueprint = False
+                for key in dir(plugin):
+                    blueprint = getattr(plugin, key, None)
+                    if blueprint and inspect.isclass(blueprint) and \
+                        issubclass(blueprint, Blueprint) and blueprint != Blueprint:
+                        ns = blueprint._config.namespace
+                        name = blueprint._config.name
+                        aliases = getattr(blueprint._config, 'aliases', [])
+                        if ns not in blueprints:
+                            blueprints[ns] = {}
+                        # end if
+                        blueprints[ns][name] = blueprint
+                        for alias in aliases:
+                            blueprints[ns][alias] = blueprint
+                        # end for
+                        found_blueprint = True
+                    # end if
+                # end for
+                if not found_blueprint:
+                    logger.warn("Not blueprints were found in plugin '%s'", plugin_name)
+            # end if
         # end for
-
-        plugin_dirs.append(os.path.join(CONFIG_DIR, 'plugins'))
-        plugin_dirs.append(os.path.join(INSTALL_DIR, 'plugins'))
-        return plugin_dirs
-    # end def get_plugin_dirs
-
-    def get_plugins(self, plugin_dirs):
-        """
-        :synopsis: get_plugins
-        :param list *args: List of args
-        :param dict **kwargs: Dict of keyword args
-        """
-
-        all_plugins = []
-        for plugin_dir in plugin_dirs:
-            plugin_files = glob(os.path.join(plugin_dir, '*'))
-            all_plugins.extend(
-                map(lambda f: f.split('.')[0], 
-                    map(os.path.basename, plugin_files)
-                    )
-                )
-        # end for
-        return list(set(all_plugins))
-    # end def get_plugins
-    
-    def import_plugin(self, plugin):
-        old_sys_path = copy(sys.path)
-        new_sys_path = copy(self.plugin_dirs)
-        new_sys_path.extend(sys.path)
-        sys.path = new_sys_path
-        try:
-            __import__(plugin)
-        except Exception, ex:
-            raise RuntimeError("Could not import plugin: %s\n%s" % (plugin, ex))
-        plugin_mod = sys.modules[plugin]
-        sys.path = old_sys_path
-        return plugin_mod
-    # end def import_plugin
+        return blueprints
+    # end def get_blueprints
 # end class Builder
 
 

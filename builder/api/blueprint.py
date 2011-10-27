@@ -11,6 +11,9 @@ except ImportError:
     pass
 
 class BlueprintConfig(object):
+    keys = ('name', 'namespace', 'version', 'version', 'author', 
+                 'email', 'desc', 'help', 'usage', 'aliases')
+    
     name = ''
     namespace = ''
     version = ()
@@ -19,11 +22,15 @@ class BlueprintConfig(object):
     desc = ''
     help = ''
     usage = ''
+    aliases = ()
     
     def __init__(self, opts):
         if opts:
-            for key, value in opts.__dict__.iteritems():
-                setattr(self, key, value)
+            #for key, value in opts.__dict__.iteritems():
+            for key in self.keys:
+                value = getattr(opts, key, None)
+                if value:
+                    setattr(self, key, value)
             # end for
         # end if
     # end def __init__
