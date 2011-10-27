@@ -26,7 +26,7 @@ CONFIG_DIR = os.path.expanduser(
 
 class Builder(object):
     """docstring for Builder"""
-    __usage__ = "prog plugin.blueprint [options]"
+    __usage__ = "%prog <namespace>.<blueprint> [options]"
     
     def __init__(self):
         super(Builder, self).__init__()
@@ -148,8 +148,8 @@ class Builder(object):
         if 'list_blueprints' in context:
             del context['list_blueprints']
         # end if
-        if 'list_plugins'in context:
-            del context['list_plugins']
+        if 'list_namespaces'in context:
+            del context['list_namespaces']
         # end if
         if 'logging_level'in context:
             del context['logging_level']
@@ -187,6 +187,7 @@ class Builder(object):
                 plugin = loadPlugin(plugin_name)
                 self.loaded_plugins.append(plugin_name)
             except ImportError:
+                plugin = None
                 logger.warn("Plugin '%s' could not be loaded.", plugin_name)
             # end try
             if plugin:
