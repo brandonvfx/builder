@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+# encoding: utf-8
+"""
+{{ filename }}
+
+Created by {{name}} <{{email}}> on {{ now.strftime("%m/%d/%Y") }}.
+Copyright (c) {{ now.strftime("%Y") }} __MyCompanyName__. All rights reserved.
+"""
+
