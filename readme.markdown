@@ -1,6 +1,6 @@
 # builder
 
-Builder is a tool/framework for automating task. It allows you to create simple "blueprints" to be executed from the command line.
+Builder is a tool/framework for simplifying command line tasks. It allows you to create simple "blueprints" to be executed from the command line.
 
 ## Usage
 	
