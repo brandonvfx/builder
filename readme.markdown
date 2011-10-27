@@ -7,10 +7,10 @@ Builder is a tool/framework for automating task. It allows you to create simple 
 	builder <namespace>.<blueprint> [options]
 	
 	Example:
-	builder python.command_line_script --working_dir=/tmp -f script.py
+	builder python.command_line_script --working-dir=/tmp -f script.py
 	namespace: python
 	blueprint: command_line_script 
-	options: --working_dir=/tmp -f script.py
+	options: --working-dir=/tmp -f script.py
 
 ## Configuration
 
@@ -28,7 +28,7 @@ This section is free form you can define any extra key value pair you would like
 Here you can define aliases to blueprints. The aliases can be just the full blueprint name (<namespace>.<blueprint>) or a command line string (full blueprint name plus any options.)
 
 #### plugins
-This is where you define what plugins should be loaded. This is a list of python modules to load blueprints from. The blueprint should be import directly from the module you provide.
+This is a list of python modules to load blueprints from. The blueprint should be importable directly from the module you provide, submodules will not be searched. 
 
 #### blueprint defaults
 To add default values for a specific blueprint you can define a section using the full blueprint name as key section key with a nested dictionary of key value pairs mapping to the options of that blueprint.
@@ -36,7 +36,25 @@ To add default values for a specific blueprint you can define a section using th
 	python.command_line_script:
 		file_name: testing.py
 
+#### Example Config file
+	
+	aliases: 
+	    t: testing.test_script
+	builder: 
+	    email: email@yourdomain.com
+	    name: Your Name
+	context: 
+	    twitter_name: @twitter_name
+	plugins: 
+	    - blueprints.test
+	    - blueprints.python
+	    - blueprints.django
+	python.command_line_script:
+	    filename: /tmp/testing.py
+
 ## Creating A Blueprint
+
+There is a repo for the best of the best blueprints called [builder_blueprints](http://github.com/brandonvfx/builder_blueprints). For now it is just kind of a reference for how to build a blueprint.
 
 Basic blueprint class:
 
@@ -48,7 +66,8 @@ Basic blueprint class:
 
 	class MyBlueprint(Blueprint):
 		options = Blueprint.options + [
-        	# your options using mkae_option
+        	# your options using make_option
+			# please don't set dest for now.
     	]
 
 		# blueprint configuration
