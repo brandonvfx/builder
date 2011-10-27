@@ -35,8 +35,10 @@ class BuilderConfig(object):
         
         for section in config:
             if section not in ['builder', 'context'] and section not in ['aliases', 'plugins']:
-                print section
-                self.blueprint_defaults.update(config.get(section, {}))
+                if section not in self.blueprint_defaults:
+                    self.blueprint_defaults[section] = {}
+                # end if
+                self.blueprint_defaults[section].update(config.get(section, {}))
             # end if
         # end for
     # end def load_config

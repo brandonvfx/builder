@@ -34,6 +34,7 @@ class Builder(object):
         self.config = BuilderConfig(CONFIG_DIR)
         self.plugins = self.config.plugins
         self.loaded_plugins = []
+        self.aliases = copy(self.config.aliases)
         self.blueprints = self.get_blueprints()
         self.logger = logger
         self.plugin_data = {}
@@ -58,10 +59,6 @@ class Builder(object):
         blueprint_name = "default" if len(parts) == 1 else parts[1]
         return namespace, blueprint_name
     # end def parse_plugin_blueprint
-
-    def check_for_alias(self, fullname):
-        return self.config.aliases.get(fullname)
-    # end def check_for_alias
     
     def main(self, input_args=sys.argv):
         cmd_args = copy(input_args)
@@ -86,11 +83,19 @@ class Builder(object):
             # end if
         # end if
         
-        aliased = self.check_for_alias(blueprint_fullname)
+        aliased = self.aliases.get(blueprint_fullname)
         if aliased:
-            full_alias = aliased.split()
-            blueprint_fullname = full_alias.pop(0)
-            new_cmd_args = full_alias
+            alias_args = aliased.split()
+            if len(full_alias) > 1:
+                blueprint_fullname = alias_args.pop(0)
+                # Only one level of recursion for aliases at this time.
+                nested_alias = self.aliases.get(blueprint_fullname)
+                if nested_alias:
+                    blueprint_fullname = nested_alias
+                # end if
+            # end if
+            # insert that alias's args before the command line args
+            new_cmd_args = alias_args
             new_cmd_args.extend(cmd_args)
             cmd_args = new_cmd_args
         # end if
@@ -200,7 +205,7 @@ class Builder(object):
                         # end if
                         blueprints[ns][name] = blueprint
                         for alias in aliases:
-                            blueprints[ns][alias] = blueprint
+                            self.aliases['%s.%s' % (ns, alias)] = '%s.%s' % (ns, name) 
                         # end for
                         found_blueprint = True
                     # end if
