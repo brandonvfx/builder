@@ -7,7 +7,7 @@ from jinja2 import Environment, FileSystemLoader
 class BlueprintTemplateMixIn(object):
     """docstring for BlueprintTemplateMixIn"""
     template_dir = None
-    def renderTemplate(self, template_name, options):
+    def renderTemplate(self, template_name, options, args=[]):
     	template_dirs = []
     	env_template_dirs = os.path.expandvars('$BUILDER_TEMPLATE_PATH').split(os.path.pathsep)
     	if env_template_dirs:
@@ -21,6 +21,7 @@ class BlueprintTemplateMixIn(object):
         
         context = deepcopy(options)
         context['now'] = datetime.datetime.now()
+        context['arg_list'] = args
 
         return jinja_env.get_template(template_name).render(context)
     # end def renderTemplate

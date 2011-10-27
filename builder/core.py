@@ -86,20 +86,18 @@ class Builder(object):
         aliased = self.aliases.get(blueprint_fullname)
         if aliased:
             alias_args = aliased.split()
-            if len(full_alias) > 1:
-                blueprint_fullname = alias_args.pop(0)
-                # Only one level of recursion for aliases at this time.
-                nested_alias = self.aliases.get(blueprint_fullname)
-                if nested_alias:
-                    blueprint_fullname = nested_alias
-                # end if
+            blueprint_fullname = alias_args.pop(0)
+            # Only one level of recursion for aliases at this time.
+            nested_alias = self.aliases.get(blueprint_fullname)
+            if nested_alias:
+                blueprint_fullname = nested_alias
             # end if
             # insert that alias's args before the command line args
             new_cmd_args = alias_args
             new_cmd_args.extend(cmd_args)
             cmd_args = new_cmd_args
         # end if
-
+        
         namespace, blueprint_name = self.parse_blueprint_name(blueprint_fullname)
         if namespace not in self.blueprints:
             print "Error finding blueprint '%s'.\n" % blueprint_fullname

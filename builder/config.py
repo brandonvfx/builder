@@ -46,7 +46,10 @@ class BuilderConfig(object):
     def get_blueprint_config(self, blueprint):
         config = {}
         config.update(self.context_defaults)
-        config.update(self.blueprint_defaults.get(blueprint, {}))
+        blueprint_defaults = self.blueprint_defaults.get(blueprint, {})
+        for key, value in self.blueprint_defaults.items():
+            config[key.replace('-', '_')] = value
+        # end if
         return config
     # end def get_blueprint_config
 

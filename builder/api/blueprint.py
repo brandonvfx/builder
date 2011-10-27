@@ -52,7 +52,7 @@ class BlueprintBase(object):
     __metaclass__ = BlueprintMeta
     
     options = [
-        make_option('--working_dir', dest='working_dir', action='store', default=os.getcwd()),
+        make_option('--working-dir', action='store', default=os.getcwd()),
     ]
 
     def __init__(self):
@@ -60,8 +60,8 @@ class BlueprintBase(object):
         :synopsis: __init__
         """
         super(BlueprintBase, self).__init__()
-        
-        if not self._config.version or not self._config.name: #or not self._config.namespace:
+        self.log = logger
+        if not self._config.version or not self._config.name or not self._config.namespace:
             raise RuntimeError("You must set name and version for " \
                 "Blueprint class '%s'" % self.__class__.__name__)
         self.errors = []
